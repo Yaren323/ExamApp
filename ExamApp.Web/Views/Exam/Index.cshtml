@@ -1,0 +1,24 @@
+﻿@{
+    ViewData["Title"] = "Sınav";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title">Sınav Bilgileri</h3>
+                </div>
+                <div class="card-body">
+                    <p>Bu sınav toplam 10 sorudan oluşmaktadır.</p>
+                    <p>Her soru için 60 saniye süreniz bulunmaktadır.</p>
+                    <p>Doğru cevaplar 1 puan değerindedir.</p>
+
+                    <form asp-action="StartExam" method="post">
+                        <button type="submit" class="btn btn-success btn-lg mt-3">Sınavı Başlat</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

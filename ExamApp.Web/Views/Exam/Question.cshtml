@@ -1,0 +1,113 @@
+﻿@model ExamApp.Core.Entities.Question
+@{
+    ViewData["Title"] = "Soru";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Soru @(ViewBag.QuestionIndex + 1)/@ViewBag.TotalQuestions</h5>
+                    <div id="timer" class="badge bg-warning text-dark fs-6">@ViewBag.TimeLimit</div>
+                </div>
+                <div class="card-body">
+                    <h4 class="card-title">@Model.Text</h4>
+
+                    <div class="options-container mt-4">
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-primary option-btn" data-option="A">A) @Model.OptionA</button>
+                            <button class="btn btn-outline-primary option-btn" data-option="B">B) @Model.OptionB</button>
+                            <button class="btn btn-outline-primary option-btn" data-option="C">C) @Model.OptionC</button>
+                            <button class="btn btn-outline-primary option-btn" data-option="D">D) @Model.OptionD</button>
+                        </div>
+                    </div>
+
+                    <div id="feedback" class="mt-3 d-none">
+                        <div class="alert alert-info">
+                            <strong>Doğru Cevap: <span id="correct-answer"></span></strong>
+                        </div>
+                        <a id="next-question" href="#" class="btn btn-primary">Sonraki Soru</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="answer-form" method="post" class="d-none">
+    <input type="hidden" name="examResultId" value="@ViewBag.ExamResultId" />
+    <input type="hidden" name="questionId" value="@Model.Id" />
+    <input type="hidden" name="selectedAnswer" id="selected-answer" />
+    <input type="hidden" name="timeSpent" id="time-spent" />
+    <input type="hidden" name="questionIndex" value="@ViewBag.QuestionIndex" />
+</form>
+
+@section Scripts {
+    <script>
+        let timeLeft = @ViewBag.TimeLimit;
+        let timerInterval;
+        let timeSpent = 0;
+
+        function startTimer() {
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timeSpent++;
+                document.getElementById('timer').textContent = timeLeft;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    // Süre doldu, otomatik olarak bir sonraki soruya geç
+                    document.getElementById('time-spent').value = timeSpent;
+                    document.getElementById('selected-answer').value = '';
+                    document.getElementById('answer-form').submit();
+                }
+            }, 1000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            startTimer();
+
+            document.querySelectorAll('.option-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const selectedOption = this.getAttribute('data-option');
+                    document.getElementById('selected-answer').value = selectedOption;
+                    document.getElementById('time-spent').value = timeSpent;
+
+                    // AJAX ile cevabı gönder
+                    fetch('@Url.Action("SubmitAnswer", "Exam")', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams(new FormData(document.getElementById('answer-form')))
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        clearInterval(timerInterval);
+
+                        // Buton renklerini güncelle
+                        document.querySelectorAll('.option-btn').forEach(optionBtn => {
+                            const option = optionBtn.getAttribute('data-option');
+                            if (option === selectedOption) {
+                                optionBtn.classList.remove('btn-outline-primary');
+                                optionBtn.classList.add(data.isCorrect ? 'btn-success' : 'btn-danger');
+                            } else if (option === data.correctAnswer) {
+                                optionBtn.classList.remove('btn-outline-primary');
+                                optionBtn.classList.add('btn-success');
+                            }
+                            optionBtn.disabled = true;
+                        });
+
+                        // Geri bildirim göster
+                        document.getElementById('correct-answer').textContent = data.correctAnswer;
+                        document.getElementById('feedback').classList.remove('d-none');
+
+                        // Sonraki soru linkini güncelle
+                        document.getElementById('next-question').href = data.nextUrl;
+                    });
+                });
+            });
+        });
+    </script>
+}
