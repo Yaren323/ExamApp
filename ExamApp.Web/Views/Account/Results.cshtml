@@ -1,0 +1,50 @@
+﻿@model IEnumerable<ExamApp.Core.Models.ExamResult>
+@{
+    ViewData["Title"] = "Geçmiş Sınav Sonuçları";
+}
+
+<div class="container">
+    <h2>Geçmiş Sınav Sonuçları</h2>
+
+    @if (!Model.Any())
+    {
+        <div class="alert alert-info">
+            Henüz hiç sınav sonucunuz bulunmamaktadır.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Sınav Tarihi</th>
+                        <th>Puan</th>
+                        <th>Toplam Soru</th>
+                        <th>Başarı Oranı</th>
+                        <th>Detay</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var result in Model.OrderByDescending(r => r.ExamDate))
+                    {
+                        <tr>
+                            <td>@result.ExamDate.ToString("dd.MM.yyyy HH:mm")</td>
+                            <td>@result.Score</td>
+                            <td>@result.TotalQuestions</td>
+                            <td>%@((result.Score * 100) / (result.TotalQuestions * 10))</td>
+                            <td>
+                                <a href="@Url.Action("Result", "Exam", new { id = result.Id })" class="btn btn-sm btn-info">Detay</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="mt-3">
+        <a href="@Url.Action("Index", "Home")" class="btn btn-secondary">Ana Sayfa</a>
+        <a href="@Url.Action("Start", "Exam")" class="btn btn-primary">Yeni Sınav Başlat</a>
+    </div>
+</div>

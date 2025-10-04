@@ -1,95 +1,180 @@
-﻿using ExamApp.Core.Entities;
-using ExamApp.Core.Interfaces;
+﻿using ExamApp.Core.Interfaces;
+using ExamApp.Core.Models;
+using ExamApp.Service.DTOs;
 using ExamApp.Service.Interfaces;
-namespace ExamApp.Service.Services;
 
-
-public class ExamService : IExamService
+namespace ExamApp.Service.Services
 {
-    private readonly IUnitOfWork _unitOfWork;
-
-    public ExamService(IUnitOfWork unitOfWork)
+    public class ExamService : IExamService
     {
-        _unitOfWork = unitOfWork;
-    }
+        private readonly IUnitOfWork _unitOfWork;
 
-    public async Task<List<Question>> GetAllQuestionsAsync()
-    {
-        return (await _unitOfWork.Questions.GetAllAsync()).ToList();
-    }
-
-    public async Task<Question> GetQuestionByIdAsync(int id)
-    {
-        return await _unitOfWork.Questions.GetByIdAsync(id);
-    }
-
-    public async Task<ExamResult> StartExamAsync(int userId)
-    {
-        var questions = await GetAllQuestionsAsync();
-        var examResult = new ExamResult
+        public ExamService(IUnitOfWork unitOfWork)
         {
-            UserId = userId,
-            TotalQuestions = questions.Count,
-            Score = 0,
-            ExamDate = DateTime.UtcNow
-        };
-
-        await _unitOfWork.ExamResults.AddAsync(examResult);
-        await _unitOfWork.SaveChangesAsync();
-
-        return examResult;
-    }
-
-    public async Task<(bool IsCorrect, string CorrectAnswer)> SubmitAnswerAsync(int examResultId, int questionId, string selectedAnswer, int timeSpent)
-    {
-        var question = await _unitOfWork.Questions.GetByIdAsync(questionId);
-        var isCorrect = selectedAnswer == question.CorrectAnswer;
-
-        var userAnswer = new UserAnswer
-        {
-            ExamResultId = examResultId,
-            QuestionId = questionId,
-            SelectedAnswer = selectedAnswer,
-            IsCorrect = isCorrect,
-            TimeSpentSeconds = timeSpent
-        };
-
-        await _unitOfWork.UserAnswers.AddAsync(userAnswer);
-
-        if (isCorrect)
-        {
-            var examResult = await _unitOfWork.ExamResults.GetByIdAsync(examResultId);
-            examResult.Score += question.Points;
-            _unitOfWork.ExamResults.Update(examResult);
+            _unitOfWork = unitOfWork;
         }
 
-        await _unitOfWork.SaveChangesAsync();
+        public async Task<IEnumerable<QuestionDto>> GetQuestionsAsync()
+        {
+            var allQuestions = await _unitOfWork.Questions.GetAllAsync();
 
-        return (isCorrect, question.CorrectAnswer);
-    }
+            // TOPLAM PUAN 100 OLAN SORULAR SEÇ
+            var selectedQuestions = SelectQuestionsFor100Points(allQuestions);
 
-    public async Task<ExamResult> CompleteExamAsync(int examResultId)
-    {
-        var examResult = await _unitOfWork.ExamResults.GetByIdAsync(examResultId);
-        return examResult;
-    }
+            // ŞIKLARI KARIŞTIR
+            var questionDtos = new List<QuestionDto>();
+            foreach (var question in selectedQuestions)
+            {
+                questionDtos.Add(ShuffleOptions(question));
+            }
 
-    public async Task<List<ExamResult>> GetUserExamResultsAsync(int userId)
-    {
-        var allResults = await _unitOfWork.ExamResults.GetAllAsync();
-        return allResults.Where(er => er.UserId == userId).ToList();
-    }
+            return questionDtos;
+        }
 
-    public async Task<List<UserAnswer>> GetUserIncorrectAnswersAsync(int userId)
-    {
-        var examResults = await GetUserExamResultsAsync(userId);
-        var examResultIds = examResults.Select(er => er.Id).ToList();
+        public async Task<ExamResult> SubmitExamAsync(ExamSubmissionDto submission)
+        {
+            var questions = await _unitOfWork.Questions.GetAllAsync();
+            var examQuestions = questions.Where(q => submission.Answers.Keys.Contains(q.Id)).ToList();
 
-        var allUserAnswers = await _unitOfWork.UserAnswers.GetAllAsync();
-        var incorrectAnswers = allUserAnswers
-            .Where(ua => examResultIds.Contains(ua.ExamResultId) && !ua.IsCorrect)
-            .ToList();
+            int score = 0;
+            int correctCount = 0;
+            var wrongAnswers = new List<WrongAnswer>();
 
-        return incorrectAnswers;
+            foreach (var answer in submission.Answers)
+            {
+                var question = examQuestions.FirstOrDefault(q => q.Id == answer.Key);
+                if (question != null && !string.IsNullOrEmpty(answer.Value))
+                {
+                    // DOĞRU CEVABI METİN OLARAK KARŞILAŞTIR - BURASI ÇOK ÖNEMLİ!
+                    if (question.CorrectAnswer.Trim().ToLower() == answer.Value.Trim().ToLower())
+                    {
+                        score += question.Points;
+                        correctCount++;
+                        Console.WriteLine($"DOĞRU: Soru {question.Id}, Cevap: {answer.Value}, Puan: {question.Points}");
+                    }
+                    else
+                    {
+                        wrongAnswers.Add(new WrongAnswer
+                        {
+                            QuestionId = question.Id,
+                            SelectedAnswer = answer.Value,
+                            CorrectAnswer = question.CorrectAnswer
+                        });
+                        Console.WriteLine($"YANLIŞ: Soru {question.Id}, Seçilen: {answer.Value}, Doğru: {question.CorrectAnswer}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"BOŞ/GEÇERSİZ: Soru {answer.Key}");
+                }
+            }
+
+            var examResult = new ExamResult
+            {
+                UserId = submission.UserId,
+                Score = score,
+                TotalQuestions = examQuestions.Count,
+                CorrectAnswers = correctCount,
+                ExamDate = DateTime.UtcNow
+            };
+
+            await _unitOfWork.ExamResults.AddAsync(examResult);
+            await _unitOfWork.CommitAsync();
+
+            foreach (var wrongAnswer in wrongAnswers)
+            {
+                wrongAnswer.ExamResultId = examResult.Id;
+                await _unitOfWork.WrongAnswers.AddAsync(wrongAnswer);
+            }
+            await _unitOfWork.CommitAsync();
+
+            Console.WriteLine($"SONUÇ: Toplam Puan: {score}, Doğru Sayısı: {correctCount}, Toplam Soru: {examQuestions.Count}");
+
+            return examResult;
+        }
+
+        public async Task<ExamResultDto?> GetExamResultAsync(int resultId)
+        {
+            var result = await _unitOfWork.ExamResults.GetByIdAsync(resultId);
+            if (result == null) return null;
+
+            var user = await _unitOfWork.Users.GetByIdAsync(result.UserId);
+            if (user == null) return null;
+
+            return new ExamResultDto
+            {
+                Id = result.Id,
+                Username = user.Username,
+                Score = result.Score,
+                TotalQuestions = result.TotalQuestions,
+                CorrectAnswers = result.CorrectAnswers,
+                ExamDate = result.ExamDate
+            };
+        }
+
+        private List<Question> SelectQuestionsFor100Points(IEnumerable<Question> allQuestions)
+        {
+            var questions = allQuestions.ToList();
+            if (questions.Count == 0) return new List<Question>();
+
+            var random = new Random();
+            var selectedQuestions = new List<Question>();
+            int totalPoints = 0;
+            int targetPoints = 100;
+
+            // Soruları karıştır
+            questions = questions.OrderBy(x => random.Next()).ToList();
+
+            foreach (var question in questions)
+            {
+                if (totalPoints + question.Points <= targetPoints)
+                {
+                    selectedQuestions.Add(question);
+                    totalPoints += question.Points;
+                }
+
+                if (totalPoints >= targetPoints)
+                    break;
+            }
+
+            // Eğer hiç soru seçilemediyse, en azından ilk soruyu ekle
+            if (selectedQuestions.Count == 0 && questions.Count > 0)
+            {
+                selectedQuestions.Add(questions.First());
+            }
+
+            return selectedQuestions;
+        }
+
+        private QuestionDto ShuffleOptions(Question question)
+        {
+            // Doğru cevabın metnini bul
+            var correctAnswerText = question.CorrectAnswer;
+
+            // Tüm şıkları ve harflerini listeye al
+            var options = new List<(string Letter, string Text)>
+            {
+                ("A", question.OptionA),
+                ("B", question.OptionB),
+                ("C", question.OptionC),
+                ("D", question.OptionD)
+            };
+
+            // Şıkları karıştır
+            var shuffled = options.OrderBy(x => Guid.NewGuid()).ToList();
+
+            return new QuestionDto
+            {
+                Id = question.Id,
+                Text = question.Text,
+                OptionA = shuffled[0].Text,
+                OptionB = shuffled[1].Text,
+                OptionC = shuffled[2].Text,
+                OptionD = shuffled[3].Text,
+                CorrectAnswer = correctAnswerText, // Doğru cevabın metni DEĞİŞMEZ
+                Points = question.Points,
+                ShuffledOptions = shuffled.Select(x => x.Text).ToList()
+            };
+        }
     }
 }

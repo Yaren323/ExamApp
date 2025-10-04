@@ -1,89 +1,57 @@
-﻿
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Authorization;
+﻿using ExamApp.Service.DTOs;
 using ExamApp.Service.Interfaces;
-namespace ExamApp.Web.Controllers;
+using Microsoft.AspNetCore.Mvc;
 
-
-[Authorize]
-public class ExamController : Controller
+namespace ExamApp.Web.Controllers
 {
-    private readonly IExamService _examService;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-
-    public ExamController(IExamService examService, IHttpContextAccessor httpContextAccessor)
+    public class ExamController : Controller
     {
-        _examService = examService;
-        _httpContextAccessor = httpContextAccessor;
-    }
+        private readonly IExamService _examService;
 
-    public IActionResult Index()
-    {
-        return View();
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> StartExam()
-    {
-        var userId = HttpContext.Session.GetInt32("UserId");
-        if (userId == null) return RedirectToAction("Login", "Account");
-
-        var examResult = await _examService.StartExamAsync(userId.Value);
-        return RedirectToAction("Question", new { examResultId = examResult.Id, questionIndex = 0 });
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> Question(int examResultId, int questionIndex)
-    {
-        var questions = await _examService.GetAllQuestionsAsync();
-        if (questionIndex >= questions.Count)
-            return RedirectToAction("CompleteExam", new { examResultId });
-
-        ViewBag.ExamResultId = examResultId;
-        ViewBag.QuestionIndex = questionIndex;
-        ViewBag.TotalQuestions = questions.Count;
-        ViewBag.TimeLimit = questions[questionIndex].TimeLimitSeconds;
-
-        return View(questions[questionIndex]);
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> SubmitAnswer(int examResultId, int questionId, string selectedAnswer, int timeSpent, int questionIndex)
-    {
-        var (isCorrect, correctAnswer) = await _examService.SubmitAnswerAsync(examResultId, questionId, selectedAnswer, timeSpent);
-
-        return Json(new
+        public ExamController(IExamService examService)
         {
-            isCorrect,
-            correctAnswer,
-            nextUrl = Url.Action("Question", new { examResultId, questionIndex = questionIndex + 1 })
-        });
-    }
+            _examService = examService;
+        }
 
-    [HttpGet]
-    public async Task<IActionResult> CompleteExam(int examResultId)
-    {
-        var examResult = await _examService.CompleteExamAsync(examResultId);
-        return View(examResult);
-    }
+        public async Task<IActionResult> Start()
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null)
+                return RedirectToAction("Login", "Account");
 
-    [HttpGet]
-    public async Task<IActionResult> Results()
-    {
-        var userId = HttpContext.Session.GetInt32("UserId");
-        if (userId == null) return RedirectToAction("Login", "Account");
+            var questions = await _examService.GetQuestionsAsync();
 
-        var results = await _examService.GetUserExamResultsAsync(userId.Value);
-        return View(results);
-    }
+            // Toplam soru sayısını ve puanı view'a gönder
+            ViewBag.TotalQuestions = questions.Count();
+            ViewBag.TotalPoints = questions.Sum(q => q.Points);
 
-    [HttpGet]
-    public async Task<IActionResult> IncorrectAnswers()
-    {
-        var userId = HttpContext.Session.GetInt32("UserId");
-        if (userId == null) return RedirectToAction("Login", "Account");
+            return View(questions);
+        }
 
-        var incorrectAnswers = await _examService.GetUserIncorrectAnswersAsync(userId.Value);
-        return View(incorrectAnswers);
+        [HttpPost]
+        public async Task<IActionResult> Submit(Dictionary<int, string> answers)
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null)
+                return RedirectToAction("Login", "Account");
+
+            var submission = new ExamSubmissionDto
+            {
+                UserId = userId.Value,
+                Answers = answers
+            };
+
+            var result = await _examService.SubmitExamAsync(submission);
+            return RedirectToAction("Result", new { id = result.Id });
+        }
+
+        public async Task<IActionResult> Result(int id)
+        {
+            var result = await _examService.GetExamResultAsync(id);
+            if (result == null)
+                return NotFound();
+
+            return View(result);
+        }
     }
 }

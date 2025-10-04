@@ -1,8 +1,28 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "Ana Sayfa";
+    var isLoggedIn = !string.IsNullOrEmpty(Context.Session.GetString("Username"));
+    var username = Context.Session.GetString("Username");
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">Sınav Uygulamasına Hoşgeldiniz</h1>
+
+    @if (isLoggedIn)
+    {
+        <div class="mt-4">
+            <h3>Hoşgeldin, @username!</h3>
+            <p>Sınava başlamak için aşağıdaki butonu kullanabilirsiniz.</p>
+            <a href="@Url.Action("Start", "Exam")" class="btn btn-primary btn-lg mt-3">Sınavı Başlat</a>
+            <a href="@Url.Action("Results", "Account")" class="btn btn-secondary btn-lg mt-3">Geçmiş Sonuçlar</a>
+            <a href="@Url.Action("Logout", "Account")" class="btn btn-outline-danger btn-lg mt-3">Çıkış Yap</a>
+        </div>
+    }
+    else
+    {
+        <div class="mt-4">
+            <p>Sınava başlamak için lütfen giriş yapın veya kayıt olun.</p>
+            <a href="@Url.Action("Login", "Account")" class="btn btn-primary">Giriş Yap</a>
+            <a href="@Url.Action("Register", "Account")" class="btn btn-secondary">Kayıt Ol</a>
+        </div>
+    }
 </div>

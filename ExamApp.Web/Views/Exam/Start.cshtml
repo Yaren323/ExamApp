@@ -1,0 +1,110 @@
+﻿@model IEnumerable<ExamApp.Service.DTOs.QuestionDto>
+@{
+    ViewData["Title"] = "Sınav";
+    var totalQuestions = Model.Count();
+    var totalPoints = Model.Sum(q => q.Points);
+}
+
+<div class="container">
+    <h1>Sınav</h1>
+    <div class="alert alert-info">
+        <strong>Toplam:</strong> @totalQuestions soru, @totalPoints puan
+    </div>
+    <div id="timer" class="alert alert-warning">Kalan Süre: 60 saniye</div>
+
+    <form id="examForm" method="post" action="@Url.Action("Submit", "Exam")">
+        @{
+            int questionNumber = 1;
+        }
+        @foreach (var question in Model)
+        {
+            <div class="card mb-3 question-card" data-question-id="@question.Id">
+                <div class="card-body">
+                    <h5 class="card-title">Soru @questionNumber: @question.Text</h5>
+                    <div class="btn-group-vertical w-100" role="group">
+                        <button type="button" class="btn btn-outline-primary answer-btn" data-answer="@question.OptionA">A) @question.OptionA</button>
+                        <button type="button" class="btn btn-outline-primary answer-btn" data-answer="@question.OptionB">B) @question.OptionB</button>
+                        <button type="button" class="btn btn-outline-primary answer-btn" data-answer="@question.OptionC">C) @question.OptionC</button>
+                        <button type="button" class="btn btn-outline-primary answer-btn" data-answer="@question.OptionD">D) @question.OptionD</button>
+                    </div>
+                    <input type="hidden" name="answers[@question.Id]" id="answer-@question.Id" />
+                </div>
+            </div>
+            questionNumber++;
+        }
+        <button type="submit" class="btn btn-success btn-lg">Sınavı Tamamla</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        let timeLeft = 60;
+        const timerElement = document.getElementById('timer');
+        const questions = document.querySelectorAll('.question-card');
+        let currentQuestionIndex = 0;
+        let timerInterval;
+
+        function startTimer() {
+            clearInterval(timerInterval); // Önceki timer'ı temizle
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerElement.textContent = `Kalan Süre: ${timeLeft} saniye`;
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    nextQuestion();
+                }
+            }, 1000); // 1000ms = 1 saniye
+        }
+
+        function nextQuestion() {
+            clearInterval(timerInterval); // Mevcut timer'ı durdur
+
+            if (currentQuestionIndex < questions.length - 1) {
+                questions[currentQuestionIndex].style.display = 'none';
+                currentQuestionIndex++;
+                questions[currentQuestionIndex].style.display = 'block';
+                timeLeft = 60; // Her soru için 60 saniye
+                startTimer();
+            } else {
+                // Son soruya ulaşıldı, formu submit et
+                document.getElementById('examForm').submit();
+            }
+        }
+
+        document.querySelectorAll('.answer-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const questionCard = this.closest('.question-card');
+                const questionId = questionCard.dataset.questionId;
+                const answer = this.dataset.answer; // CEVAP METNİ
+
+                console.log(`Soru ${questionId} için cevap: ${answer}`);
+
+                // Tüm butonları resetle
+                questionCard.querySelectorAll('.answer-btn').forEach(b => {
+                    b.classList.remove('btn-success', 'btn-danger');
+                    b.classList.add('btn-outline-primary');
+                });
+
+                // Seçili butonu işaretle (sadece görsel - doğru/yanlış gösterme)
+                this.classList.remove('btn-outline-primary');
+                this.classList.add('btn-primary');
+
+                // Hidden input'a CEVAP METNİNİ kaydet
+                document.getElementById(`answer-${questionId}`).value = answer;
+                console.log(`Hidden input değeri: ${document.getElementById(`answer-${questionId}`).value}`);
+
+                // 3 saniye sonra sonraki soruya geç (daha yavaş)
+                setTimeout(nextQuestion, 3000);
+            });
+        });
+
+        // İlk soruyu göster, diğerlerini gizle
+        questions.forEach((q, index) => {
+            if (index !== 0) q.style.display = 'none';
+        });
+
+        // İlk timer'ı başlat
+        startTimer();
+    </script>
+}
