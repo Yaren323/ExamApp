@@ -71,7 +71,14 @@ namespace ExamApp.Web.Controllers
         public IActionResult AddQuestion()
         {
             if (!IsAdmin()) return RedirectToAction("Login");
-            return View();
+
+            // Boş bir model oluştur
+            var question = new Question
+            {
+                Points = 10 
+            };
+
+            return View(question);
         }
 
         [HttpPost]
@@ -104,7 +111,12 @@ namespace ExamApp.Web.Controllers
             if (!IsAdmin()) return RedirectToAction("Login");
 
             var question = await _adminService.GetQuestionByIdAsync(id);
-            if (question == null) return NotFound();
+            if (question == null)
+            {
+                // Hata mesajı göster veya dashboard'a yönlendir
+                TempData["Error"] = "Soru bulunamadı!";
+                return RedirectToAction("Dashboard");
+            }
 
             return View(question);
         }
