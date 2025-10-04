@@ -1,0 +1,42 @@
+﻿@model ExamApp.Service.DTOs.ExamResultDto
+@{
+    ViewData["Title"] = "Sınav Sonucu";
+}
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h3 class="text-center">Sınav Sonucu</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <h4>Tebrikler @Model.Username!</h4>
+                        <div class="display-4 text-primary">@Model.Score Puan</div>
+                        <p><strong>Doğru Sayısı:</strong> @Model.CorrectAnswers / @Model.TotalQuestions</p>
+                        <p><strong>Başarı Oranı:</strong> %@Model.SuccessRate.ToString("0.0")</p>
+                        <p><strong>Sınav Tarihi:</strong> @Model.ExamDate.ToString("dd.MM.yyyy HH:mm")</p>
+                    </div>
+
+                    <div class="progress mb-4" style="height: 30px;">
+                        @{
+                            var percentage = Model.SuccessRate;
+                        }
+                        <div class="progress-bar @(percentage >= 70 ? "bg-success" : percentage >= 50 ? "bg-warning" : "bg-danger")"
+                             role="progressbar" style="width: @percentage%"
+                             aria-valuenow="@percentage" aria-valuemin="0" aria-valuemax="100">
+                            %@percentage.ToString("0.0")
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="@Url.Action("Results", "Account")" class="btn btn-info">Tüm Sonuçlar</a>
+                        <a href="@Url.Action("Start", "Exam")" class="btn btn-primary">Tekrar Dene</a>
+                        <a href="@Url.Action("Index", "Home")" class="btn btn-secondary">Ana Sayfa</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

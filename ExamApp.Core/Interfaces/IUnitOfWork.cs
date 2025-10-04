@@ -1,17 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ExamApp.Core.Entities;
+﻿using ExamApp.Core.Models;
 
-namespace ExamApp.Core.Interfaces;
-
-public interface IUnitOfWork : IDisposable
+namespace ExamApp.Core.Interfaces
 {
-    IRepository<User> Users { get; }
-    IRepository<Question> Questions { get; }
-    IRepository<ExamResult> ExamResults { get; }
-    IRepository<UserAnswer> UserAnswers { get; }
-    Task<bool> SaveChangesAsync();
+    public interface IUnitOfWork : IDisposable
+    {
+        IRepository<User> Users { get; }
+        IRepository<Question> Questions { get; }
+        IRepository<ExamResult> ExamResults { get; }
+        IRepository<WrongAnswer> WrongAnswers { get; }
+
+        Task<int> CommitAsync();
+    }
 }
+
+

@@ -1,66 +1,110 @@
-﻿namespace ExamApp.Web.Controllers;
-using Microsoft.AspNetCore.Mvc;
-using ExamApp.Core.Entities;
+﻿using ExamApp.Service.DTOs;
 using ExamApp.Service.Interfaces;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 
-public class AccountController : Controller
+namespace ExamApp.Web.Controllers
 {
-    private readonly IUserService _userService;
-
-    public AccountController(IUserService userService)
+    public class AccountController : Controller
     {
-        _userService = userService;
-    }
+        private readonly IUserService _userService;
 
-    [HttpGet]
-    public IActionResult Login()
-    {
-        return View();
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> Login(string username, string password)
-    {
-        var user = await _userService.AuthenticateAsync(username, password);
-
-        if (user == null)
+        public AccountController(IUserService userService)
         {
-            ModelState.AddModelError("", "Kullanıcı adı veya şifre hatalı");
+            _userService = userService;
+        }
+
+        public IActionResult Login()
+        {
+            // Eğer zaten giriş yapılmışsa ana sayfaya yönlendir
+            if (HttpContext.Session.GetString("Username") != null)
+            {
+                return RedirectToAction("Index", "Home");
+            }
             return View();
         }
 
-        // Basit authentication (gerçek uygulamada JWT veya Identity kullanın)
-        HttpContext.Session.SetInt32("UserId", user.Id);
-        HttpContext.Session.SetString("Username", user.Username);
-        HttpContext.Session.SetString("Role", user.Role);
-
-        return RedirectToAction("Index", "Home");
-    }
-
-    [HttpGet]
-    public IActionResult Register()
-    {
-        return View();
-    }
-
-    [HttpPost]
-    public async Task<IActionResult> Register(User user, string password)
-    {
-        try
+        [HttpPost]
+        public async Task<IActionResult> Login(LoginDto loginDto)
         {
-            await _userService.CreateAsync(user, password);
-            return RedirectToAction("Login");
-        }
-        catch (Exception ex)
-        {
-            ModelState.AddModelError("", ex.Message);
-            return View(user);
-        }
-    }
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return View(loginDto);
+                }
 
-    public IActionResult Logout()
-    {
-        HttpContext.Session.Clear();
-        return RedirectToAction("Index", "Home");
+                var user = await _userService.LoginAsync(loginDto);
+                if (user == null)
+                {
+                    ViewBag.Error = "Kullanıcı adı veya şifre hatalı";
+                    return View(loginDto);
+                }
+
+                HttpContext.Session.SetInt32("UserId", user.Id);
+                HttpContext.Session.SetString("Username", user.Username);
+                HttpContext.Session.SetString("Role", user.Role.ToString());
+
+                return RedirectToAction("Index", "Home");
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+                return View(loginDto);
+            }
+        }
+
+        public IActionResult Register()
+        {
+            // Eğer zaten giriş yapılmışsa ana sayfaya yönlendir
+            if (HttpContext.Session.GetString("Username") != null)
+            {
+                return RedirectToAction("Index", "Home");
+            }
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Register(RegisterDto registerDto)
+        {
+            try
+            {
+                if (!ModelState.IsValid)
+                {
+                    return View(registerDto);
+                }
+
+                var user = await _userService.RegisterAsync(registerDto);
+
+                // KAYIT OLDUKTAN SONRA OTOMATİK GİRİŞ YAP
+                HttpContext.Session.SetInt32("UserId", user.Id);
+                HttpContext.Session.SetString("Username", user.Username);
+                HttpContext.Session.SetString("Role", user.Role.ToString());
+
+                // ANA SAYFAYA YÖNLENDİR
+                return RedirectToAction("Index", "Home");
+            }
+            catch (Exception ex)
+            {
+                ViewBag.Error = ex.Message;
+                return View(registerDto);
+            }
+        }
+
+        public IActionResult Logout()
+        {
+            HttpContext.Session.Clear();
+            return RedirectToAction("Index", "Home");
+        }
+
+        public async Task<IActionResult> Results()
+        {
+            var userId = HttpContext.Session.GetInt32("UserId");
+            if (userId == null)
+                return RedirectToAction("Login", "Account");
+
+            var results = await _userService.GetUserExamResultsAsync(userId.Value);
+            return View(results);
+        }
     }
 }

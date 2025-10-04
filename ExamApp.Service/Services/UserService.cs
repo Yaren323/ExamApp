@@ -1,57 +1,83 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using ExamApp.Core.Entities;
-using ExamApp.Core.Interfaces;
+﻿using ExamApp.Core.Interfaces;
+using ExamApp.Core.Models;
+using ExamApp.Service.DTOs;
 using ExamApp.Service.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
 
-namespace ExamApp.Service.Services;
-
-
-public class UserService : IUserService
+namespace ExamApp.Service.Services
 {
-    private readonly IUnitOfWork _unitOfWork;
-
-    public UserService(IUnitOfWork unitOfWork)
+    public class UserService : IUserService
     {
-        _unitOfWork = unitOfWork;
-    }
+        private readonly IUnitOfWork _unitOfWork;
 
-    public async Task<User> AuthenticateAsync(string username, string password)
-    {
-        var users = await _unitOfWork.Users.GetAllAsync();
-        var user = users.FirstOrDefault(u => u.Username == username);
+        public UserService(IUnitOfWork unitOfWork)
+        {
+            _unitOfWork = unitOfWork;
+        }
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(password, user.PasswordHash))
-            return null;
+        public async Task<User> RegisterAsync(RegisterDto registerDto)
+        {
+            // Kullanıcı adı ve email kontrolü
+            var existingUser = await _unitOfWork.Users.SingleOrDefaultAsync(u =>
+                u.Username == registerDto.Username || u.Email == registerDto.Email);
 
-        return user;
-    }
+            if (existingUser != null)
+                throw new Exception("Kullanıcı adı veya email zaten kullanımda");
 
-    public async Task<User> GetByIdAsync(int id)
-    {
-        return await _unitOfWork.Users.GetByIdAsync(id);
-    }
+            // Şifre hashleme - TUTARLI BİR YÖNTEM
+            var hashedPassword = HashPassword(registerDto.Password);
 
-    public async Task<User> CreateAsync(User user, string password)
-    {
-        if (await UserExistsAsync(user.Username))
-            throw new Exception("Kullanıcı adı zaten mevcut");
+            var user = new User
+            {
+                Username = registerDto.Username,
+                Email = registerDto.Email,
+                PasswordHash = hashedPassword,
+                Role = UserRole.User,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
-        user.CreatedDate = DateTime.UtcNow;
+            await _unitOfWork.Users.AddAsync(user);
+            await _unitOfWork.CommitAsync();
 
-        await _unitOfWork.Users.AddAsync(user);
-        await _unitOfWork.SaveChangesAsync();
+            return user;
+        }
 
-        return user;
-    }
+        public async Task<User?> LoginAsync(LoginDto loginDto)
+        {
+            var user = await _unitOfWork.Users.SingleOrDefaultAsync(u => u.Username == loginDto.Username);
 
-    public async Task<bool> UserExistsAsync(string username)
-    {
-        var users = await _unitOfWork.Users.GetAllAsync();
-        return users.Any(u => u.Username == username);
+            if (user == null)
+                return null;
+
+            // Şifre doğrulama - AYNI HASH YÖNTEMİNİ KULLAN
+            var hashedPassword = HashPassword(loginDto.Password);
+
+            if (user.PasswordHash != hashedPassword)
+                return null;
+
+            return user;
+        }
+
+        public async Task<User?> GetUserByIdAsync(int id)
+        {
+            return await _unitOfWork.Users.GetByIdAsync(id);
+        }
+
+        public async Task<IEnumerable<ExamResult>> GetUserExamResultsAsync(int userId)
+        {
+            return await _unitOfWork.ExamResults.FindAsync(er => er.UserId == userId);
+        }
+
+        private string HashPassword(string password)
+        {
+            // TUTARLI BİR HASH YÖNTEMİ - SHA256
+            using (var sha256 = SHA256.Create())
+            {
+                var bytes = Encoding.UTF8.GetBytes(password);
+                var hash = sha256.ComputeHash(bytes);
+                return Convert.ToBase64String(hash);
+            }
+        }
     }
 }

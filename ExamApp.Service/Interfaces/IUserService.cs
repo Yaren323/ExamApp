@@ -1,16 +1,13 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using ExamApp.Core.Models;
+using ExamApp.Service.DTOs;
 
-namespace ExamApp.Service.Interfaces;
-using ExamApp.Core.Entities;
-
-public interface IUserService
+namespace ExamApp.Service.Interfaces
 {
-    Task<User> AuthenticateAsync(string username, string password);
-    Task<User> GetByIdAsync(int id);
-    Task<User> CreateAsync(User user, string password);
-    Task<bool> UserExistsAsync(string username);
+    public interface IUserService
+    {
+        Task<User> RegisterAsync(RegisterDto registerDto);
+        Task<User> LoginAsync(LoginDto loginDto);
+        Task<User> GetUserByIdAsync(int id);
+        Task<IEnumerable<ExamResult>> GetUserExamResultsAsync(int userId);
+    }
 }
