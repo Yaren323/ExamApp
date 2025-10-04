@@ -1,6 +1,14 @@
 ﻿@model ExamApp.Core.Models.Question
 @{
     ViewData["Title"] = "Soruyu Düzenle";
+
+    // Null kontrolü
+    if (Model == null)
+    {
+        // Model null ise hata sayfasına yönlendir veya boş model oluştur
+        <div class="alert alert-danger">Soru bulunamadı!</div>
+        return;
+    }
 }
 
 <div class="container">
@@ -11,19 +19,19 @@
 
         <div class="mb-3">
             <label asp-for="Text" class="form-label">Soru Metni</label>
-            <textarea asp-for="Text" class="form-control" rows="3" required></textarea>
+            <textarea asp-for="Text" class="form-control" rows="3" required>@Model.Text</textarea>
             <span asp-validation-for="Text" class="text-danger"></span>
         </div>
 
         <div class="row mb-3">
             <div class="col-md-6">
                 <label asp-for="OptionA" class="form-label">A Şıkkı</label>
-                <input asp-for="OptionA" class="form-control" required>
+                <input asp-for="OptionA" class="form-control" value="@Model.OptionA" required>
                 <span asp-validation-for="OptionA" class="text-danger"></span>
             </div>
             <div class="col-md-6">
                 <label asp-for="OptionB" class="form-label">B Şıkkı</label>
-                <input asp-for="OptionB" class="form-control" required>
+                <input asp-for="OptionB" class="form-control" value="@Model.OptionB" required>
                 <span asp-validation-for="OptionB" class="text-danger"></span>
             </div>
         </div>
@@ -31,25 +39,25 @@
         <div class="row mb-3">
             <div class="col-md-6">
                 <label asp-for="OptionC" class="form-label">C Şıkkı</label>
-                <input asp-for="OptionC" class="form-control" required>
+                <input asp-for="OptionC" class="form-control" value="@Model.OptionC" required>
                 <span asp-validation-for="OptionC" class="text-danger"></span>
             </div>
             <div class="col-md-6">
                 <label asp-for="OptionD" class="form-label">D Şıkkı</label>
-                <input asp-for="OptionD" class="form-control" required>
+                <input asp-for="OptionD" class="form-control" value="@Model.OptionD" required>
                 <span asp-validation-for="OptionD" class="text-danger"></span>
             </div>
         </div>
 
-        <!-- DEĞİŞEN KISIM: Doğru Cevap artık metin seçimi -->
+        <!-- Doğru Cevap Dropdown -->
         <div class="mb-3">
             <label asp-for="CorrectAnswer" class="form-label">Doğru Cevap</label>
             <select asp-for="CorrectAnswer" class="form-control" required>
                 <option value="">Doğru Cevabı Seçin</option>
-                <option value="@Model.OptionA">A) @Model.OptionA</option>
-                <option value="@Model.OptionB">B) @Model.OptionB</option>
-                <option value="@Model.OptionC">C) @Model.OptionC</option>
-                <option value="@Model.OptionD">D) @Model.OptionD</option>
+                <option value="@Model.OptionA" selected="@(Model.CorrectAnswer == Model.OptionA)">A) @Model.OptionA</option>
+                <option value="@Model.OptionB" selected="@(Model.CorrectAnswer == Model.OptionB)">B) @Model.OptionB</option>
+                <option value="@Model.OptionC" selected="@(Model.CorrectAnswer == Model.OptionC)">C) @Model.OptionC</option>
+                <option value="@Model.OptionD" selected="@(Model.CorrectAnswer == Model.OptionD)">D) @Model.OptionD</option>
             </select>
             <small class="form-text text-muted">Doğru cevabın metnini seçin (A/B/C/D değil)</small>
             <span asp-validation-for="CorrectAnswer" class="text-danger"></span>
@@ -57,7 +65,7 @@
 
         <div class="mb-3">
             <label asp-for="Points" class="form-label">Puan</label>
-            <input asp-for="Points" type="number" class="form-control" required min="1" max="100">
+            <input asp-for="Points" type="number" class="form-control" value="@Model.Points" required min="1" max="100">
             <span asp-validation-for="Points" class="text-danger"></span>
         </div>
 
@@ -105,9 +113,6 @@
             optionBInput.addEventListener('input', updateCorrectAnswerOptions);
             optionCInput.addEventListener('input', updateCorrectAnswerOptions);
             optionDInput.addEventListener('input', updateCorrectAnswerOptions);
-
-            // İlk yüklemede de güncelle
-            updateCorrectAnswerOptions();
         });
     </script>
 }
